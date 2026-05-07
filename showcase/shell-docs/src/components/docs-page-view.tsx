@@ -9,6 +9,7 @@
 
 import React from "react";
 import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
@@ -118,15 +119,16 @@ export async function DocsPageView({
   });
 
   function renderNavItem(node: NavNode, depth: number = 0): React.ReactNode {
-    const indent = depth * 16;
     if (node.type === "section") {
       return (
         <div
           key={`section-${node.title}`}
-          className="text-[10px] font-mono uppercase tracking-widest text-[var(--text-faint)] mt-4 mb-2"
-          style={{ paddingLeft: `${indent}px` }}
+          className="flex items-center gap-2 mt-6 mb-3 h-4"
         >
-          {node.title}
+          <span className="text-[10px] uppercase shrink-0 text-[var(--text-muted)]">
+            {node.title}
+          </span>
+          <div className="flex-1 h-px bg-[var(--border-dim)]" />
         </div>
       );
     }
@@ -136,82 +138,120 @@ export async function DocsPageView({
         ? "docs"
         : "framework";
       return (
-        <div style={{ paddingLeft: `${indent}px` }} key={node.slug}>
-          <SidebarLink
-            slug={node.slug}
-            scope={scope}
-            fallbackHref={`${slugHrefPrefix}/${node.slug}`}
-            active={isActive}
-            className={`block py-[5px] text-[13px] transition-colors ${
-              isActive
-                ? "text-[var(--accent)] font-medium"
-                : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-            }`}
-          >
-            {node.title}
-          </SidebarLink>
-        </div>
+        <SidebarLink
+          key={node.slug}
+          slug={node.slug}
+          scope={scope}
+          fallbackHref={`${slugHrefPrefix}/${node.slug}`}
+          active={isActive}
+          className={`flex items-center h-10 px-3 text-sm rounded-lg shrink-0 transition-all duration-200 ${
+            isActive
+              ? "bg-[var(--bg-surface)] text-[var(--text)] shadow-sm"
+              : "text-[var(--text-muted)] hover:bg-[var(--bg-surface)]/60 hover:text-[var(--text)]"
+          }`}
+        >
+          {node.title}
+        </SidebarLink>
       );
     }
+    // Group: a labeled folder with nested children. When the group has
+    // a visible title, render its children with an indent + vertical
+    // guide line (border-l) — the tree-connector look from the
+    // canonical docs sidebar. Title-less wrapper groups (used to flatten
+    // a section's content) skip the indent.
+    const hasTitle = !!node.title;
     return (
       <div key={`group-${node.slug}`} className="mt-1">
-        {node.title && (
-          <div
-            className="py-[5px] text-[13px] font-medium text-[var(--text-secondary)]"
-            style={{ paddingLeft: `${indent}px` }}
-          >
+        {hasTitle && (
+          <div className="flex items-center h-10 px-3 text-sm font-medium text-[var(--text)] shrink-0">
             {node.title}
           </div>
         )}
-        {node.children.map((child) => renderNavItem(child, depth + 1))}
+        <div
+          className={
+            hasTitle
+              ? "ml-3 pl-3 border-l border-[var(--border-dim)] flex flex-col"
+              : "flex flex-col"
+          }
+        >
+          {node.children.map((child) => renderNavItem(child, depth + 1))}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex" style={{ height: "calc(100vh - 53px)" }}>
-      <SidebarNav className="w-[240px] shrink-0 border-r border-[var(--border)] bg-[var(--bg)] overflow-y-auto p-4">
+    <div className="flex pl-2">
+      <SidebarNav className="w-[260px] shrink-0 self-start sticky top-[88px] xl:top-[112px] max-h-[calc(100vh-88px)] xl:max-h-[calc(100vh-112px)] rounded-l-2xl backdrop-blur-lg border border-r-0 border-[var(--border)] bg-[var(--glass-background)] overflow-y-auto px-3">
         <SidebarFrameworkSelector />
         <div className="mb-4" />
         {tree.map((node) => renderNavItem(node))}
       </SidebarNav>
 
-      {/* <main> is the full-width scroll container so the scrollbar
-       * lands at the viewport (or TOC) edge. Content width is capped
-       * by the inner wrapper. Previously `max-w-3xl` sat on <main>
-       * directly, which parked the scrollbar mid-page. */}
-      <main className="flex-1 overflow-y-auto">
-        <div className="max-w-3xl px-8 py-8">
-          <nav className="flex items-center gap-1 text-xs text-[var(--text-muted)] mb-4 flex-wrap">
-            {breadcrumbs.map((crumb, i) => (
-              <React.Fragment key={i}>
-                {i > 0 && (
-                  <span className="text-[var(--text-faint)]">&gt;</span>
-                )}
-                {crumb.href ? (
-                  <Link
-                    href={crumb.href}
-                    className="hover:text-[var(--text-secondary)] transition-colors"
-                  >
-                    {crumb.label}
-                  </Link>
-                ) : (
-                  <span className="text-[var(--text)]">{crumb.label}</span>
-                )}
-              </React.Fragment>
-            ))}
-          </nav>
+      {/* Page-level scroll model: <main> flows naturally and the only
+       * scrollbar is at the viewport edge. The sidebar and TOC are
+       * sticky so they stay in view as the page scrolls; each may
+       * scroll INTERNALLY when its own content exceeds the remaining
+       * viewport height. Width is capped by the inner wrapper.
+       *
+       * `.docs-content-wrapper` paints a white panel with a soft
+       * left-edge fade — purely cosmetic, mirroring canonical's
+       * docs-content-wrapper without re-introducing internal scroll. */}
+      <main className="flex-1 min-w-0 docs-content-wrapper">
+        {/* Outer padding mirrors canonical docs.copilotkit.ai (px-8 py-6
+         * at the small end, xl:px-16 xl:py-12 once the rail has room).
+         * The inner max-w cap (~900px) keeps long-form text from running
+         * edge-to-edge on wide viewports, matching canonical's effective
+         * column width with sidebar+TOC accounted for. */}
+        <div className="px-8 py-6 xl:px-16 xl:py-12 max-sm:px-4 max-sm:py-6">
+          <div className="max-w-[900px]">
+            {/* Breadcrumb styling tracks canonical fumadocs PageBreadcrumb:
+             * text-sm with a ChevronRight separator, intermediate links
+             * muted, last segment in primary text + medium weight. */}
+            <nav className="flex items-center gap-1.5 text-sm text-[var(--text-muted)] mb-4 flex-wrap">
+              {breadcrumbs.map((crumb, i) => {
+                const isLast = i === breadcrumbs.length - 1;
+                const labelClass = `truncate ${isLast ? "text-[var(--text)] font-medium" : ""}`;
+                return (
+                  <React.Fragment key={i}>
+                    {i > 0 && (
+                      <ChevronRight
+                        className="size-3.5 shrink-0"
+                        aria-hidden="true"
+                      />
+                    )}
+                    {crumb.href ? (
+                      <Link
+                        href={crumb.href}
+                        className={`${labelClass} transition-opacity hover:opacity-80`}
+                      >
+                        {crumb.label}
+                      </Link>
+                    ) : (
+                      <span className={labelClass}>{crumb.label}</span>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </nav>
 
-          <h1 className="text-[2rem] font-bold text-[var(--text)] tracking-tight mb-2 leading-tight">
-            {doc.fm.title}
-          </h1>
-          {doc.fm.description && (
-            <p className="text-base text-[var(--text-muted)] mb-6 leading-relaxed">
-              {doc.fm.description}
-            </p>
-          )}
+            {/* Title + description spacing mirrors canonical: gap-5
+             * between the H1 and the description, then a generous
+             * bottom margin before the body so the header reads as a
+             * distinct block. Title sizes scale from 32px to 40px at
+             * md+ to match docs.copilotkit.ai. */}
+            <div className="flex flex-col gap-5">
+              <h1 className="text-[32px] md:text-[40px] font-medium text-[var(--text)] leading-[1.2]">
+                {doc.fm.title}
+              </h1>
+              {doc.fm.description && (
+                <p className="text-lg text-[var(--text-muted)] mb-14 max-lg:mb-12 max-sm:mb-10 leading-relaxed">
+                  {doc.fm.description}
+                </p>
+              )}
+            </div>
 
-          {bannerSlot}
+            {bannerSlot}
 
           {!hideBody &&
             (() => {
@@ -290,22 +330,54 @@ export async function DocsPageView({
                       // #anchor links resolve. Slugify the child text with the
                       // same algorithm used by extractHeadings() so IDs line up
                       // with the TOC entries.
+                      // H2/H3 carry stable slug IDs (already used by the
+                      // right-rail TOC) and now also surface a hover-only
+                      // `#` anchor link for deep-linking, mirroring the
+                      // canonical fumadocs prose chrome.
                       h2: ({
                         children,
                         ...rest
-                      }: React.HTMLAttributes<HTMLHeadingElement>) => (
-                        <h2 id={slugify(childrenToText(children))} {...rest}>
-                          {children}
-                        </h2>
-                      ),
+                      }: React.HTMLAttributes<HTMLHeadingElement>) => {
+                        const id = slugify(childrenToText(children));
+                        return (
+                          <h2
+                            id={id}
+                            {...rest}
+                            className={`docs-heading group ${rest.className ?? ""}`}
+                          >
+                            {children}
+                            <a
+                              href={`#${id}`}
+                              aria-label="Link to this section"
+                              className="docs-heading-anchor"
+                            >
+                              #
+                            </a>
+                          </h2>
+                        );
+                      },
                       h3: ({
                         children,
                         ...rest
-                      }: React.HTMLAttributes<HTMLHeadingElement>) => (
-                        <h3 id={slugify(childrenToText(children))} {...rest}>
-                          {children}
-                        </h3>
-                      ),
+                      }: React.HTMLAttributes<HTMLHeadingElement>) => {
+                        const id = slugify(childrenToText(children));
+                        return (
+                          <h3
+                            id={id}
+                            {...rest}
+                            className={`docs-heading group ${rest.className ?? ""}`}
+                          >
+                            {children}
+                            <a
+                              href={`#${id}`}
+                              aria-label="Link to this section"
+                              className="docs-heading-anchor"
+                            >
+                              #
+                            </a>
+                          </h3>
+                        );
+                      },
                       // When rendering under a framework-scoped route, rewrite
                       // root-relative MDX links (/quickstart, /shared-state, …)
                       // to the framework-scoped equivalent so clicks never land
@@ -343,6 +415,7 @@ export async function DocsPageView({
               }
               return body;
             })()}
+          </div>
         </div>
       </main>
 
