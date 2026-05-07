@@ -86,13 +86,21 @@ samp {
  * a5b37bef1) is preserved — there is no internal scroll container. */
 .docs-content-wrapper {
   background-color: var(--bg-surface);
-  background-image: linear-gradient(90deg, rgba(1, 5, 7, 0.1), rgba(1, 5, 7, 0));
+  background-image: linear-gradient(
+    90deg,
+    rgba(1, 5, 7, 0.1),
+    rgba(1, 5, 7, 0)
+  );
 }
 
 [data-theme="dark"] .docs-content-wrapper,
 .dark .docs-content-wrapper {
   background-color: var(--glass-background);
-  background-image: linear-gradient(90deg, rgba(1, 5, 7, 0.1), rgba(1, 5, 7, 0));
+  background-image: linear-gradient(
+    90deg,
+    rgba(1, 5, 7, 0.1),
+    rgba(1, 5, 7, 0)
+  );
 }
 
 /* Reference content (MDX) typography — calibrated against docs.copilotkit.ai.

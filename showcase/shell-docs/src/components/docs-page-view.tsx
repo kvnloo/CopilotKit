@@ -253,168 +253,168 @@ export async function DocsPageView({
 
             {bannerSlot}
 
-          {!hideBody &&
-            (() => {
-              const body = (
-                <div className="reference-content">
-                  <MDXRemote
-                    source={content}
-                    components={{
-                      ...docsComponents,
-                      Snippet: (props: Record<string, unknown>) => (
-                        <Snippet
-                          {...(props as Record<string, string | undefined>)}
-                          defaultFramework={defaultFramework}
-                          defaultCell={defaultCell}
-                        />
-                      ),
-                      WhenFrameworkHas: (props: Record<string, unknown>) => (
-                        <WhenFrameworkHas
-                          {...(props as {
-                            flag: "a2ui_pattern" | "interrupt_pattern";
-                            equals?: string;
-                            absent?: boolean;
-                            framework?: string;
-                            children?: React.ReactNode;
-                          })}
-                          defaultFramework={defaultFramework}
-                        />
-                      ),
-                      // MDX pages author in-page variant selectors as
-                      // `<Tabs groupId="language_langgraph_agent" default="Python">`.
-                      // When the URL scope is a specific variant (e.g.
-                      // `/langgraph-typescript/*`), pre-select the
-                      // matching tab instead of the author's hardcoded
-                      // default so the code visible on arrival matches
-                      // the URL the user followed. Slugs without a
-                      // mapping (or tabs whose groupId isn't listed in
-                      // TAB_DEFAULTS_BY_SLUG) fall through to the MDX
-                      // `default` and the component's first-label
-                      // fallback unchanged.
-                      Tabs: (props: {
-                        groupId?: string;
-                        default?: string;
-                        items?: string[];
-                        children?: React.ReactNode;
-                        persist?: boolean;
-                      }) => {
-                        const urlDefault = getTabDefault(
-                          frameworkOverride ?? null,
-                          props.groupId,
-                        );
-                        return (
-                          <DocsTabs
-                            {...props}
-                            default={urlDefault ?? props.default}
-                          >
-                            {props.children}
-                          </DocsTabs>
-                        );
-                      },
-                      InlineDemo: (props: Record<string, unknown>) => {
-                        const InlineDemoComp = docsComponents.InlineDemo;
-                        return (
-                          <InlineDemoComp
-                            {...(props as {
-                              integration?: string;
-                              demo?: string;
-                            })}
-                            integration={
-                              defaultFramework ??
-                              (props.integration as string | undefined)
-                            }
+            {!hideBody &&
+              (() => {
+                const body = (
+                  <div className="reference-content">
+                    <MDXRemote
+                      source={content}
+                      components={{
+                        ...docsComponents,
+                        Snippet: (props: Record<string, unknown>) => (
+                          <Snippet
+                            {...(props as Record<string, string | undefined>)}
+                            defaultFramework={defaultFramework}
+                            defaultCell={defaultCell}
                           />
-                        );
-                      },
-                      // Inject stable IDs on H2/H3 so the right-rail TOC's
-                      // #anchor links resolve. Slugify the child text with the
-                      // same algorithm used by extractHeadings() so IDs line up
-                      // with the TOC entries.
-                      // H2/H3 carry stable slug IDs (already used by the
-                      // right-rail TOC) and now also surface a hover-only
-                      // `#` anchor link for deep-linking, mirroring the
-                      // canonical fumadocs prose chrome.
-                      h2: ({
-                        children,
-                        ...rest
-                      }: React.HTMLAttributes<HTMLHeadingElement>) => {
-                        const id = slugify(childrenToText(children));
-                        return (
-                          <h2
-                            id={id}
-                            {...rest}
-                            className={`docs-heading group ${rest.className ?? ""}`}
-                          >
-                            {children}
-                            <a
-                              href={`#${id}`}
-                              aria-label="Link to this section"
-                              className="docs-heading-anchor"
-                            >
-                              #
-                            </a>
-                          </h2>
-                        );
-                      },
-                      h3: ({
-                        children,
-                        ...rest
-                      }: React.HTMLAttributes<HTMLHeadingElement>) => {
-                        const id = slugify(childrenToText(children));
-                        return (
-                          <h3
-                            id={id}
-                            {...rest}
-                            className={`docs-heading group ${rest.className ?? ""}`}
-                          >
-                            {children}
-                            <a
-                              href={`#${id}`}
-                              aria-label="Link to this section"
-                              className="docs-heading-anchor"
-                            >
-                              #
-                            </a>
-                          </h3>
-                        );
-                      },
-                      // When rendering under a framework-scoped route, rewrite
-                      // root-relative MDX links (/quickstart, /shared-state, …)
-                      // to the framework-scoped equivalent so clicks never land
-                      // on the unscoped page and trigger a RouterPivot redirect.
-                      ...(frameworkOverride && {
-                        a: ({
-                          href,
-                          children,
-                          ...rest
-                        }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => {
-                          const resolved =
-                            href?.startsWith("/") &&
-                            !href.startsWith(`/${frameworkOverride}/`)
-                              ? `/${frameworkOverride}${href}`
-                              : href;
+                        ),
+                        WhenFrameworkHas: (props: Record<string, unknown>) => (
+                          <WhenFrameworkHas
+                            {...(props as {
+                              flag: "a2ui_pattern" | "interrupt_pattern";
+                              equals?: string;
+                              absent?: boolean;
+                              framework?: string;
+                              children?: React.ReactNode;
+                            })}
+                            defaultFramework={defaultFramework}
+                          />
+                        ),
+                        // MDX pages author in-page variant selectors as
+                        // `<Tabs groupId="language_langgraph_agent" default="Python">`.
+                        // When the URL scope is a specific variant (e.g.
+                        // `/langgraph-typescript/*`), pre-select the
+                        // matching tab instead of the author's hardcoded
+                        // default so the code visible on arrival matches
+                        // the URL the user followed. Slugs without a
+                        // mapping (or tabs whose groupId isn't listed in
+                        // TAB_DEFAULTS_BY_SLUG) fall through to the MDX
+                        // `default` and the component's first-label
+                        // fallback unchanged.
+                        Tabs: (props: {
+                          groupId?: string;
+                          default?: string;
+                          items?: string[];
+                          children?: React.ReactNode;
+                          persist?: boolean;
+                        }) => {
+                          const urlDefault = getTabDefault(
+                            frameworkOverride ?? null,
+                            props.groupId,
+                          );
                           return (
-                            <Link href={resolved ?? "#"} {...rest}>
-                              {children}
-                            </Link>
+                            <DocsTabs
+                              {...props}
+                              default={urlDefault ?? props.default}
+                            >
+                              {props.children}
+                            </DocsTabs>
                           );
                         },
-                      }),
-                    }}
-                    options={{
-                      mdxOptions: {
-                        remarkPlugins: [remarkGfm],
-                        rehypePlugins: [rehypeHighlight],
-                      },
-                    }}
-                  />
-                </div>
-              );
-              if (ContentWrapper) {
-                return <ContentWrapper>{body}</ContentWrapper>;
-              }
-              return body;
-            })()}
+                        InlineDemo: (props: Record<string, unknown>) => {
+                          const InlineDemoComp = docsComponents.InlineDemo;
+                          return (
+                            <InlineDemoComp
+                              {...(props as {
+                                integration?: string;
+                                demo?: string;
+                              })}
+                              integration={
+                                defaultFramework ??
+                                (props.integration as string | undefined)
+                              }
+                            />
+                          );
+                        },
+                        // Inject stable IDs on H2/H3 so the right-rail TOC's
+                        // #anchor links resolve. Slugify the child text with the
+                        // same algorithm used by extractHeadings() so IDs line up
+                        // with the TOC entries.
+                        // H2/H3 carry stable slug IDs (already used by the
+                        // right-rail TOC) and now also surface a hover-only
+                        // `#` anchor link for deep-linking, mirroring the
+                        // canonical fumadocs prose chrome.
+                        h2: ({
+                          children,
+                          ...rest
+                        }: React.HTMLAttributes<HTMLHeadingElement>) => {
+                          const id = slugify(childrenToText(children));
+                          return (
+                            <h2
+                              id={id}
+                              {...rest}
+                              className={`docs-heading group ${rest.className ?? ""}`}
+                            >
+                              {children}
+                              <a
+                                href={`#${id}`}
+                                aria-label="Link to this section"
+                                className="docs-heading-anchor"
+                              >
+                                #
+                              </a>
+                            </h2>
+                          );
+                        },
+                        h3: ({
+                          children,
+                          ...rest
+                        }: React.HTMLAttributes<HTMLHeadingElement>) => {
+                          const id = slugify(childrenToText(children));
+                          return (
+                            <h3
+                              id={id}
+                              {...rest}
+                              className={`docs-heading group ${rest.className ?? ""}`}
+                            >
+                              {children}
+                              <a
+                                href={`#${id}`}
+                                aria-label="Link to this section"
+                                className="docs-heading-anchor"
+                              >
+                                #
+                              </a>
+                            </h3>
+                          );
+                        },
+                        // When rendering under a framework-scoped route, rewrite
+                        // root-relative MDX links (/quickstart, /shared-state, …)
+                        // to the framework-scoped equivalent so clicks never land
+                        // on the unscoped page and trigger a RouterPivot redirect.
+                        ...(frameworkOverride && {
+                          a: ({
+                            href,
+                            children,
+                            ...rest
+                          }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => {
+                            const resolved =
+                              href?.startsWith("/") &&
+                              !href.startsWith(`/${frameworkOverride}/`)
+                                ? `/${frameworkOverride}${href}`
+                                : href;
+                            return (
+                              <Link href={resolved ?? "#"} {...rest}>
+                                {children}
+                              </Link>
+                            );
+                          },
+                        }),
+                      }}
+                      options={{
+                        mdxOptions: {
+                          remarkPlugins: [remarkGfm],
+                          rehypePlugins: [rehypeHighlight],
+                        },
+                      }}
+                    />
+                  </div>
+                );
+                if (ContentWrapper) {
+                  return <ContentWrapper>{body}</ContentWrapper>;
+                }
+                return body;
+              })()}
           </div>
         </div>
       </main>
