@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans, Spline_Sans_Mono } from "next/font/google";
+import { Plus_Jakarta_Sans } from "next/font/google";
 import Script from "next/script";
 import { Suspense } from "react";
 import { AnalyticsClient } from "@/components/analytics-client";
+import { Banners } from "@/components/banners";
 import { BrandNav } from "@/components/brand-nav";
 import { FrameworkProvider } from "@/components/framework-provider";
 import { PostHogProvider } from "@/lib/providers/posthog-provider";
@@ -24,12 +25,6 @@ export const RESERVED_ROUTE_SLUGS = [
 const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
   variable: "--font-prose",
-  display: "swap",
-});
-
-const splineSansMono = Spline_Sans_Mono({
-  subsets: ["latin"],
-  variable: "--font-mono",
   display: "swap",
 });
 
@@ -86,10 +81,7 @@ export default function RootLayout({
   const REB2B_KEY = process.env.NEXT_PUBLIC_REB2B_KEY;
 
   return (
-    <html
-      lang="en"
-      className={`${plusJakartaSans.variable} ${splineSansMono.variable}`}
-    >
+    <html lang="en" className={plusJakartaSans.variable}>
       <head>
         {REO_KEY ? (
           <Script
@@ -135,7 +127,16 @@ export default function RootLayout({
         <Suspense fallback={null}>
           <PostHogProvider>
             <FrameworkProvider knownFrameworks={knownFrameworks}>
-              <BrandNav />
+              {/* Banner + nav are pinned together as a single sticky stack
+               * so the announcement banner stays visible while scrolling.
+               * BrandNav drops its own `sticky top-0` so this outer wrapper
+               * owns positioning; without that, the nested sticky would
+               * pin the nav independently and the banner would scroll
+               * away. z-50 sits above page content, below modals (z-50+). */}
+              <div className="sticky top-0 z-50 bg-[var(--bg)]">
+                <Banners />
+                <BrandNav />
+              </div>
               <main>{children}</main>
             </FrameworkProvider>
           </PostHogProvider>
