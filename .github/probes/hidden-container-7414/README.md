@@ -42,12 +42,41 @@ reading position in both hide/show modes and retain first activation, intentiona
 thread navigation and pinned streaming behavior. No upstream PR should be opened
 from this diagnostic branch.
 
-## Validation status when authored
+## Scroll-write diagnostics
 
-JavaScript syntax and Python compilation were checked in the assistant container.
-The container has no browser dependencies and cannot resolve GitHub; no local
-browser execution is claimed. Native browser results must come from the linked
-Actions run and its `hidden-container-7414-evidence` artifact.
+After establishing the stable middle-of-thread position, the probe instruments
+only that scroll element. Each receipt includes JavaScript write attempts and
+stacks for `scrollTop`, `scrollTo`, `scrollBy`, and `scroll`, along with native
+scroll events, observed height transitions, and hide/show/re-render phase marks.
+The trace is capped at 256 records with an explicit `dropped` count. Instrumented
+properties are restored and the extra observer is disconnected before screenshots
+and trace finalization, including on failure.
+
+The observer never scrolls or suppresses existing callbacks. Write instrumentation
+forwards native receivers and arguments without re-reading option getters or
+coercing values again. A logged attempt is not proof of movement: correlate it with
+the observed scroll events and before/after row anchors. Browser-internal scrolling
+need not have a JavaScript writer stack. This is not a claim to trace every source
+of scrolling.
+
+Diagnostics add overhead. Repeat with `TRACE_SCROLL=0` to compare the same matrix
+without instrumentation before relying on a timing-sensitive finding. Trace
+timestamps are diagnostic ordering evidence, not a latency benchmark.
+
+## Validation status
+
+JavaScript syntax was checked with `node --check`. The `startScrollTrace` function
+was also extracted from this exact probe and exercised on a synthetic scrollable
+DOM in local Chromium `144.0.7559.96`: 11 diagnostic self-checks passed. They covered
+native offsets and returns, single evaluation of option getters, native errors,
+write stacks, zero/restored heights, unrelated-element exclusion, descriptor
+restoration, idempotent cleanup, bounded records, and pre-existing own methods.
+
+**Those checks validate the instrumentation, not the CopilotKit application or the
+eight-row hypothesis matrix.** The local container could not resolve GitHub or
+install the missing React/workspace dependencies. No local execution of the real
+`CopilotChatView` fixture is claimed. Application evidence must come from an actual
+completed run and its `hidden-container-7414-evidence` artifact.
 
 ## Running and reviewing the evidence
 
