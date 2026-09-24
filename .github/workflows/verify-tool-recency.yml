@@ -1,0 +1,81 @@
+name: Verify tool recency (fork only)
+
+on:
+  push:
+    branches: [verify/tool-recency-20260924]
+    paths: [.github/workflows/verify-tool-recency.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  recency:
+    if: github.repository == 'kvnloo/CopilotKit'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: examples/showcases/reskinnable-demo
+    steps:
+      - name: Checkout candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Setup Node 22
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 22
+      - name: Use the standalone app's pinned package manager
+        run: |
+          set -euo pipefail
+          corepack enable pnpm
+          corepack install
+          test "$(pnpm --version)" = 10.10.0
+          pnpm install --frozen-lockfile
+      - name: Real React component and selector regressions
+        run: pnpm exec vitest run src/shell/chat/tool-activity.test.tsx src/shell/chat/tool-activity-recency.test.ts
+      - name: Revert only implementation and require cold-restore test to fail
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin df142c9e6973fc6afad83948858ea13143832067
+          cp src/shell/chat/tool-activity.tsx "$RUNNER_TEMP/tool-activity.fixed.tsx"
+          cp src/shell/chat/tool-activity-recency.ts "$RUNNER_TEMP/recency.fixed.ts"
+          trap 'cp "$RUNNER_TEMP/tool-activity.fixed.tsx" src/shell/chat/tool-activity.tsx; cp "$RUNNER_TEMP/recency.fixed.ts" src/shell/chat/tool-activity-recency.ts' EXIT
+          git show df142c9e6973fc6afad83948858ea13143832067:examples/showcases/reskinnable-demo/src/shell/chat/tool-activity.tsx > src/shell/chat/tool-activity.tsx
+          git show df142c9e6973fc6afad83948858ea13143832067:examples/showcases/reskinnable-demo/src/shell/chat/tool-activity-recency.ts > src/shell/chat/tool-activity-recency.ts
+          set +e
+          pnpm exec vitest run src/shell/chat/tool-activity.test.tsx -t 'does not promote older history first mounted after a restored tail' --reporter=json --outputFile="$RUNNER_TEMP/recency-red.json"
+          rc=$?
+          set -e
+          test "$rc" -ne 0
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import assert from 'node:assert/strict';
+          const report = JSON.parse(fs.readFileSync(`${process.env.RUNNER_TEMP}/recency-red.json`, 'utf8'));
+          assert.equal(report.numFailedTests, 1);
+          const failures = report.testResults.flatMap(file => file.assertionResults ?? []).filter(test => test.status === 'failed');
+          assert.equal(failures.length, 1);
+          assert.match(failures[0].fullName, /first mounted after a restored tail/);
+          assert.match(failures[0].failureMessages.join('\n'), /Tool a/);
+          console.log('Confirmed real component counterexample: reverting the implementation promotes old A.');
+          JS
+      - name: Lint
+        run: pnpm lint
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Complete standalone app unit suite
+        run: pnpm test:unit
+      - name: Production build
+        run: pnpm build
+      - name: Receipt
+        if: always()
+        run: |
+          {
+            echo '## Tool recency candidate'
+            echo 'Production commit: 283aff53aa8ecc1db3b96f299e440f3bb17ed709'
+            echo 'Falsifying control: restore the two production files from df142c9; keep the new component test.'
+            echo 'React/jsdom tests use fixture framework sources. This is not a browser virtualization/paint measurement.'
+            echo 'Workflow remains on a fork-only verification branch; no upstream CI changes or deployment.'
+          } >> "$GITHUB_STEP_SUMMARY"
