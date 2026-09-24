@@ -1,0 +1,81 @@
+name: Characterize 7106 frontend lifecycle (fork only)
+
+on:
+  push:
+    branches: [verify/7106-frontend-lifecycle]
+    paths: [.github/workflows/verify-7106-frontend-lifecycle.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    if: github.repository == 'kvnloo/CopilotKit'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NX_DAEMON: 'false'
+      NX_NO_CLOUD: 'true'
+    steps:
+      - name: Checkout verification harness
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Checkout exact source under test
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: CopilotKit/CopilotKit
+          ref: eef659193309a8a4fc508289e87c2b80eff46a83
+          path: subject
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 22
+      - name: Install locked workspace dependencies
+        working-directory: subject
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = eef659193309a8a4fc508289e87c2b80eff46a83
+          corepack enable pnpm
+          corepack install
+          test "$(pnpm --version)" = 10.33.4
+          pnpm install --frozen-lockfile
+      - name: Build actual React-core workspace and prerequisites
+        working-directory: subject
+        run: pnpm -r --filter '@copilotkit/react-core...' --workspace-concurrency=2 run build
+      - name: Install diagnostic beside existing real-hook tests
+        run: |
+          mkdir -p evidence
+          cp scripts/verification/7106-frontend/7106-frontend-lifecycle.test.tsx subject/packages/react-core/src/v2/hooks/__tests__/
+          node scripts/verification/7106-frontend/report.mjs --self-test
+          git -C subject diff --exit-code -- pnpm-lock.yaml
+          sha256sum subject/pnpm-lock.yaml > evidence/lock.sha256
+      - name: Measure baseline and standard-interrupt contract separately
+        working-directory: subject/packages/react-core
+        run: |
+          set -uo pipefail
+          pnpm exec vitest run src/v2/hooks/__tests__/7106-frontend-lifecycle.test.tsx --reporter=json --outputFile="$GITHUB_WORKSPACE/evidence/lifecycle.json" 2>&1 | tee "$GITHUB_WORKSPACE/evidence/lifecycle.log"
+          code=${PIPESTATUS[0]}
+          echo "$code" > "$GITHUB_WORKSPACE/evidence/lifecycle.exit"
+          test -s "$GITHUB_WORKSPACE/evidence/lifecycle.json"
+      - name: Require a placeholder ordinary operation to fail the positive control
+        working-directory: subject/packages/react-core
+        run: |
+          set -uo pipefail
+          PROBE_MUTATION=skip-ordinary-work pnpm exec vitest run src/v2/hooks/__tests__/7106-frontend-lifecycle.test.tsx -t 'baseline normal executor' --reporter=json --outputFile="$GITHUB_WORKSPACE/evidence/negative.json" 2>&1 | tee "$GITHUB_WORKSPACE/evidence/negative.log"
+          code=${PIPESTATUS[0]}
+          echo "$code" > "$GITHUB_WORKSPACE/evidence/negative.exit"
+          test -s "$GITHUB_WORKSPACE/evidence/negative.json"
+      - name: Report exact outcomes; reject unexpected failures
+        run: node scripts/verification/7106-frontend/report.mjs evidence
+      - name: Print receipt and dependency versions
+        if: always()
+        run: |
+          git rev-parse HEAD
+          git -C subject rev-parse HEAD
+          node --version
+          cat evidence/receipt.json 2>/dev/null || true
+          cd subject/packages/react-core
+          pnpm list @ag-ui/client @ag-ui/core @copilotkit/core react react-dom vitest --depth 0
