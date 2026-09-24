@@ -48,3 +48,25 @@ JavaScript syntax and Python compilation were checked in the assistant container
 The container has no browser dependencies and cannot resolve GitHub; no local
 browser execution is claimed. Native browser results must come from the linked
 Actions run and its `hidden-container-7414-evidence` artifact.
+
+## Running and reviewing the evidence
+
+The fork workflow is `.github/workflows/hidden-container-7414.yml`. A push to
+`test/7414-hidden-container-browser-20260924` starts the diagnostic run, provided
+Actions is enabled on the fork. Its token is read-only, and the source ablation
+is never pushed back to the repository.
+
+The workflow installs frozen workspace dependencies, builds the real React
+package and the single fixture, serves it on loopback, and invokes:
+
+```sh
+node .github/probes/hidden-container-7414/probe.mjs baseline
+# After the source-pinned ablation and rebuilding the package + fixture:
+node .github/probes/hidden-container-7414/probe.mjs alignment-only
+```
+
+Review both `receipts.json` files before drawing a conclusion: each must contain
+four observations, with both ordinary re-render controls preserving position.
+A missing report, build failure, or `probe_error` means the hypothesis was not
+tested successfully. `unexpected_behavior` is a reason to revise the hypothesis,
+not to weaken the controls. Queue or runner status is not a browser result.
