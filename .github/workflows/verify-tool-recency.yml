@@ -18,9 +18,10 @@ jobs:
       run:
         working-directory: examples/showcases/reskinnable-demo
     steps:
-      - name: Checkout candidate
+      - name: Checkout pinned candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          ref: 51e842553fe1093ba3f0497cb17c75dd00cbba74
           persist-credentials: false
       - name: Setup Node 22
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
@@ -29,12 +30,22 @@ jobs:
       - name: Use the standalone app's pinned package manager
         run: |
           set -euo pipefail
+          test "$(git rev-parse HEAD)" = 51e842553fe1093ba3f0497cb17c75dd00cbba74
           corepack enable pnpm
           corepack install
           test "$(pnpm --version)" = 10.10.0
           pnpm install --frozen-lockfile
       - name: Real React component and selector regressions
-        run: pnpm exec vitest run src/shell/chat/tool-activity.test.tsx src/shell/chat/tool-activity-recency.test.ts
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run src/shell/chat/tool-activity.test.tsx src/shell/chat/tool-activity-recency.test.ts --reporter=json --outputFile="$RUNNER_TEMP/recency-green.json"
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import assert from 'node:assert/strict';
+          const report = JSON.parse(fs.readFileSync(`${process.env.RUNNER_TEMP}/recency-green.json`, 'utf8'));
+          assert.equal(report.numPassedTests, 20);
+          assert.equal(report.numFailedTests, 0);
+          JS
       - name: Revert only implementation and require cold-restore test to fail
         shell: bash
         run: |
@@ -59,7 +70,31 @@ jobs:
           assert.equal(failures.length, 1);
           assert.match(failures[0].fullName, /first mounted after a restored tail/);
           assert.match(failures[0].failureMessages.join('\n'), /Tool a/);
-          console.log('Confirmed real component counterexample: reverting the implementation promotes old A.');
+          console.log('Confirmed: the original first-mount implementation promotes old A.');
+          JS
+      - name: Revert only normalization and require replay test to fail
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin 283aff53aa8ecc1db3b96f299e440f3bb17ed709
+          cp src/shell/chat/tool-activity-recency.ts "$RUNNER_TEMP/recency.fixed.ts"
+          trap 'cp "$RUNNER_TEMP/recency.fixed.ts" src/shell/chat/tool-activity-recency.ts' EXIT
+          git show 283aff53aa8ecc1db3b96f299e440f3bb17ed709:examples/showcases/reskinnable-demo/src/shell/chat/tool-activity-recency.ts > src/shell/chat/tool-activity-recency.ts
+          set +e
+          pnpm exec vitest run src/shell/chat/tool-activity.test.tsx -t 'does not promote an older message replayed at the transcript tail' --reporter=json --outputFile="$RUNNER_TEMP/replay-red.json"
+          rc=$?
+          set -e
+          test "$rc" -ne 0
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import assert from 'node:assert/strict';
+          const report = JSON.parse(fs.readFileSync(`${process.env.RUNNER_TEMP}/replay-red.json`, 'utf8'));
+          assert.equal(report.numFailedTests, 1);
+          const failures = report.testResults.flatMap(file => file.assertionResults ?? []).filter(test => test.status === 'failed');
+          assert.equal(failures.length, 1);
+          assert.match(failures[0].fullName, /older message replayed at the transcript tail/);
+          assert.match(failures[0].failureMessages.join('\n'), /Tool a/);
+          console.log('Confirmed: removing normalization promotes replayed A.');
           JS
       - name: Lint
         run: pnpm lint
@@ -74,8 +109,8 @@ jobs:
         run: |
           {
             echo '## Tool recency candidate'
-            echo 'Production commit: 283aff53aa8ecc1db3b96f299e440f3bb17ed709'
-            echo 'Falsifying control: restore the two production files from df142c9; keep the new component test.'
+            echo 'Production commit: 51e842553fe1093ba3f0497cb17c75dd00cbba74'
+            echo 'Controls: first-mount implementation from df142c9; raw-history selector from 283aff5.'
             echo 'React/jsdom tests use fixture framework sources. This is not a browser virtualization/paint measurement.'
             echo 'Workflow remains on a fork-only verification branch; no upstream CI changes or deployment.'
           } >> "$GITHUB_STEP_SUMMARY"
