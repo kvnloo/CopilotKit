@@ -12,6 +12,85 @@ const output = path.resolve('artifacts/7414', variant);
 await mkdir(output, { recursive: true });
 const browser = await chromium.launch();
 const receipts = [];
+// Diagnostic stacks add overhead; this is not a latency benchmark.
+// Set TRACE_SCROLL=0 to repeat the same matrix without instrumentation.
+const traceScroll = process.env.TRACE_SCROLL !== '0';
+
+// Browser-realm, fork-only diagnostics; never scrolls or cancels a callback.
+function startScrollTrace() {
+  const el = window.__probeScroll;
+  if (!el?.isConnected) throw new Error('Cannot trace a missing scroll container');
+  const events = [];
+  const limit = 256;
+  let dropped = 0;
+  let phase = 'installed';
+  let stopped = false;
+  const restore = [];
+  const record = (kind, fields = {}) => {
+    try {
+      if (events.length >= limit) { dropped += 1; return; }
+      events.push({ kind, phase, at: performance.now(), ...fields });
+    } catch { /* Diagnostics must not change native scrolling behavior. */ }
+  };
+  // Do not coerce arguments or inspect option getters a second time.
+  const describe = (value) => value === null || ['number', 'string', 'boolean'].includes(typeof value)
+    ? value : `<${typeof value}>`;
+  const writes = (kind, args) => record(kind, {
+    args: args.map(describe), stack: new Error('scroll write').stack,
+  });
+  const wrap = (key, descriptor) => {
+    const previous = Object.getOwnPropertyDescriptor(el, key);
+    Object.defineProperty(el, key, { configurable: true, ...descriptor });
+    restore.push(() => previous
+      ? Object.defineProperty(el, key, previous)
+      : Reflect.deleteProperty(el, key));
+  };
+  let observer;
+  const onScroll = () => record('scroll-event', { scrollTop: el.scrollTop });
+  const stop = () => {
+    if (!stopped) {
+      stopped = true;
+      observer?.disconnect();
+      el.removeEventListener('scroll', onScroll);
+      for (const undo of restore.reverse()) undo();
+    }
+    return { events, dropped, limit };
+  };
+  try {
+    let owner = el;
+    while (owner && !Object.getOwnPropertyDescriptor(owner, 'scrollTop')) owner = Object.getPrototypeOf(owner);
+    const original = owner && Object.getOwnPropertyDescriptor(owner, 'scrollTop');
+    if (!original?.get || !original?.set) throw new Error('Unsupported scrollTop descriptor');
+    wrap('scrollTop', {
+      enumerable: original.enumerable,
+      get() { return Reflect.apply(original.get, this, []); },
+      set(value) {
+        if (this === el) writes('scrollTop:set', [value]);
+        return Reflect.apply(original.set, this, [value]);
+      },
+    });
+    for (const key of ['scrollTo', 'scrollBy', 'scroll']) {
+      const originalMethod = el[key];
+      if (typeof originalMethod !== 'function') continue;
+      wrap(key, { writable: true, value: function (...args) {
+        if (this === el) writes(key, args);
+        return Reflect.apply(originalMethod, this, args);
+      } });
+    }
+    el.addEventListener('scroll', onScroll, { passive: true });
+    observer = new ResizeObserver((entries) => {
+      for (const entry of entries) record('resize', { height: entry.contentRect.height });
+    });
+    observer.observe(el);
+    return window.__probeTrace = {
+      mark(value) { phase = value; record('mark'); },
+      stop,
+    };
+  } catch (error) {
+    stop();
+    throw error;
+  }
+}
 
 async function snapshot(page) {
   return page.evaluate(() => {
@@ -61,6 +140,7 @@ try {
       await context.tracing.start({ screenshots: true, snapshots: true, sources: true });
       const page = await context.newPage();
       const receipt = { variant, mode, operation, outcome: 'probe_error', browser: browser.version() };
+      receipt.scrollTracing = traceScroll;
       const pageErrors = [];
       const blockedRequests = [];
       page.on('pageerror', (error) => pageErrors.push(String(error)));
@@ -98,15 +178,20 @@ try {
         assert(before.scrollTop > 500, 'Reader must be in the middle, not already at the top');
         assert(before.virtualRows > 0 && before.virtualRows < 80, 'Virtualization must actually be active');
         receipt.before = before;
+        if (traceScroll) await page.evaluate(startScrollTrace);
         if (operation === 'hide-show') {
+          await page.evaluate(() => window.__probeTrace?.mark('before-hide'));
           await page.getByTestId('hide').click();
           await expect.poll(() => page.evaluate(() => window.__probeScroll.clientHeight)).toBe(0);
+          await page.evaluate(() => window.__probeTrace?.mark('while-hidden-rerender'));
           await page.getByTestId('rerender').click();
           await expect(page.locator('#probe-host [data-index]')).toHaveCount(0);
           receipt.zeroHeightObserved = true;
+          await page.evaluate(() => window.__probeTrace?.mark('before-show'));
           await page.getByTestId('show').click();
           await expect(page.locator('#probe-host')).toBeVisible();
         }
+        await page.evaluate(() => window.__probeTrace?.mark('before-rerender'));
         await page.getByTestId('rerender').click();
         await expect(page.locator('#probe-host [data-index]').first()).toBeVisible();
         assert(await page.evaluate(() => document.querySelector('[data-probe-scroll]') === window.__probeScroll), 'The scroll element must not be replaced');
@@ -123,6 +208,15 @@ try {
       } catch (error) {
         receipt.error = String(error.stack ?? error);
       } finally {
+        if (traceScroll && receipt.before) {
+          try {
+            receipt.scrollTrace = await page.evaluate(() => window.__probeTrace?.stop() ?? null);
+            if (!receipt.scrollTrace) throw new Error('Scroll trace was not installed');
+          } catch (error) {
+            receipt.traceError = String(error);
+            receipt.outcome = 'probe_error';
+          }
+        }
         receipt.pageErrors = pageErrors;
         receipt.blockedOrigins = [...new Set(blockedRequests)];
         receipts.push(receipt);
