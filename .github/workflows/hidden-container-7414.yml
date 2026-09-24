@@ -1,0 +1,82 @@
+name: Hidden container 7414 characterization
+on:
+  push:
+    branches: [test/7414-hidden-container-browser-20260924]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: hidden-container-7414-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  browser-characterization:
+    if: github.repository == 'kvnloo/CopilotKit'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CI: 'true'
+      NX_DAEMON: 'false'
+      LEFTHOOK: '0'
+      STORYBOOK_DISABLE_TELEMETRY: '1'
+      NODE_OPTIONS: --max-old-space-size=6144
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install the existing locked workspace dependencies
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.33.4 --activate
+          pnpm --filter @copilotkit-storybook/react... --filter examples-e2e --filter CopilotKit install --frozen-lockfile
+          pnpm -C examples/e2e exec playwright install --with-deps chromium
+      - name: Keep this run limited to the static fixture
+        run: |
+          mkdir -p artifacts/7414
+          { git rev-parse HEAD; git hash-object pnpm-lock.yaml; node --version; pnpm --version; } > artifacts/7414/provenance.txt
+          pnpm -C packages/react-core list use-stick-to-bottom @tanstack/react-virtual --json > artifacts/7414/dependencies.json
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('examples/v2/react/storybook/.storybook/main.ts')
+          source = p.read_text()
+          before = 'stories: ["../stories/**/*.stories.@(tsx|mdx)"],'
+          assert source.count(before) == 1
+          p.write_text(source.replace(before, 'stories: ["../stories/HiddenContainer7414.stories.tsx"],'))
+          PY
+      - name: Compare baseline and alignment-only ablation in Chromium
+        shell: bash
+        run: |
+          set -euo pipefail
+          overall=0
+          trap 'if [ -n "${server_pid:-}" ]; then kill "$server_pid" 2>/dev/null || true; fi' EXIT
+          for variant in baseline alignment-only; do
+            if [ "$variant" = alignment-only ]; then
+              python .github/probes/hidden-container-7414/isolate.py
+            fi
+            pnpm exec nx run @copilotkit/react-core:build --skip-nx-cache --parallel=1 2>&1 | tee "artifacts/7414/build-$variant.log"
+            pnpm -C examples/v2/react/storybook exec storybook build --output-dir "$RUNNER_TEMP/storybook-$variant" 2>&1 | tee "artifacts/7414/storybook-$variant.log"
+            python -m http.server 6006 --bind 127.0.0.1 --directory "$RUNNER_TEMP/storybook-$variant" > "artifacts/7414/server-$variant.log" 2>&1 &
+            server_pid=$!
+            ready=0
+            for attempt in $(seq 1 30); do
+              if curl -fsS http://127.0.0.1:6006/iframe.html > /dev/null; then ready=1; break; fi
+              sleep 1
+            done
+            test "$ready" -eq 1
+            node .github/probes/hidden-container-7414/probe.mjs "$variant" 2>&1 | tee "artifacts/7414/probe-$variant.log" || overall=1
+            kill "$server_pid"
+            wait "$server_pid" || true
+            unset server_pid
+          done
+          echo 'Characterization only: green means the expected bug matrix reproduced, not that a fix passed.' >> "$GITHUB_STEP_SUMMARY"
+          exit "$overall"
+      - name: Preserve measurements and traces on success or failure
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: hidden-container-7414-evidence
+          path: artifacts/7414
+          if-no-files-found: warn
+          retention-days: 7
