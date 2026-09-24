@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: verify-7106-frontend-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   frontend:
     if: github.repository == 'kvnloo/CopilotKit'
@@ -55,6 +59,7 @@ jobs:
       - name: Measure baseline and standard-interrupt contract separately
         working-directory: subject/packages/react-core
         run: |
+          set +e
           set -uo pipefail
           pnpm exec vitest run src/v2/hooks/__tests__/7106-frontend-lifecycle.test.tsx --reporter=json --outputFile="$GITHUB_WORKSPACE/evidence/lifecycle.json" 2>&1 | tee "$GITHUB_WORKSPACE/evidence/lifecycle.log"
           code=${PIPESTATUS[0]}
@@ -63,6 +68,7 @@ jobs:
       - name: Require a placeholder ordinary operation to fail the positive control
         working-directory: subject/packages/react-core
         run: |
+          set +e
           set -uo pipefail
           PROBE_MUTATION=skip-ordinary-work pnpm exec vitest run src/v2/hooks/__tests__/7106-frontend-lifecycle.test.tsx -t 'baseline normal executor' --reporter=json --outputFile="$GITHUB_WORKSPACE/evidence/negative.json" 2>&1 | tee "$GITHUB_WORKSPACE/evidence/negative.log"
           code=${PIPESTATUS[0]}
