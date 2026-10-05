@@ -672,6 +672,8 @@ const ChoicePicker = createVueComponent(
                 "button",
                 {
                   key: i,
+                  type: "button",
+                  "aria-pressed": isSelected,
                   onClick: () => onToggle(opt.value),
                   style: {
                     padding: "4px 12px",

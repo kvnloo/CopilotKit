@@ -89,6 +89,7 @@ export const ChoicePicker = createReactComponent(
             if (props.displayStyle === "chips") {
               return (
                 <button
+                  type="button"
                   key={i}
                   aria-pressed={isSelected}
                   onClick={() => onToggle(opt.value)}
