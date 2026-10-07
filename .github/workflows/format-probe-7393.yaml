@@ -1,0 +1,29 @@
+name: Format probe 7393
+
+on:
+  push:
+    branches: [validation/copilotkit-7393-exact-ci]
+    paths:
+      - .github/workflows/format-probe-7393.yaml
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: 1acc3e231f2dc06d02e0e4f2c9480012d7d90f20
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+      - run: pnpm install --frozen-lockfile
+      - name: Show oxfmt patch
+        run: |
+          pnpm exec oxfmt --write packages/vue/src/v2/components/__tests__/A2UIChoicePickerChips.test.ts
+          git diff -- packages/vue/src/v2/components/__tests__/A2UIChoicePickerChips.test.ts
+          test -z "$(git status --short packages/vue/src/v2/components/__tests__/A2UIChoicePickerChips.test.ts)"
