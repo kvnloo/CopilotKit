@@ -1,0 +1,33 @@
+name: Validation CopilotKit 7393 exact head
+
+on:
+  push:
+    branches: [validation/copilotkit-7393-exact-ci]
+    paths:
+      - .github/workflows/validation-copilotkit-7393-exact.yaml
+
+permissions:
+  contents: read
+
+jobs:
+  a2ui-choice-chips:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@v7
+        with:
+          ref: 582ac65f81b41ad1fa27405c9e9db99d6b2976cf
+          persist-credentials: false
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Run affected package tests and typechecks
+        run: pnpm nx run-many -t test,check-types -p @copilotkit/a2ui-renderer,@copilotkit/vue,@copilotkit/angular --parallel=2
+      - name: Check touched file formatting
+        run: pnpm exec oxfmt --check packages/a2ui-renderer/src/react-renderer/__tests__/choice-picker-pressed.test.tsx packages/a2ui-renderer/src/react-renderer/a2ui-react/catalog/basic/components/ChoicePicker.tsx packages/angular/src/a2ui/lib/__tests__/basic-catalog.spec.ts packages/angular/src/a2ui/lib/basic/choice-picker.ts packages/vue/src/v2/components/__tests__/A2UIChoicePickerChips.test.ts packages/vue/src/v2/components/a2ui/catalog.ts
