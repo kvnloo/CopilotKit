@@ -17,7 +17,7 @@ jobs:
       - name: Check out exact candidate
         uses: actions/checkout@v7
         with:
-          ref: 1acc3e231f2dc06d02e0e4f2c9480012d7d90f20
+          ref: c92a19a88fd43e53b58b05a3b1786f0ba4ba850f
           persist-credentials: false
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
