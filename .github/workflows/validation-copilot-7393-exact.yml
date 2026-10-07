@@ -1,0 +1,52 @@
+name: Validation CopilotKit 7393 exact head
+
+on:
+  push:
+    branches: [validation/copilot-7393-exact-ci]
+    paths:
+      - .github/workflows/validation-copilot-7393-exact.yml
+
+permissions:
+  contents: read
+
+jobs:
+  focused:
+    if: github.repository == 'kvnloo/CopilotKit'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out exact origin head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: c92a19a88fd43e53b58b05a3b1786f0ba4ba850f
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413
+
+      - name: Setup Node 22
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: React ChoicePicker regression
+        run: pnpm --filter @copilotkit/a2ui-renderer exec vitest run src/react-renderer/__tests__/choice-picker-pressed.test.tsx
+
+      - name: React renderer typecheck
+        run: pnpm --filter @copilotkit/a2ui-renderer check-types
+
+      - name: Vue ChoicePicker regression
+        run: pnpm --filter @copilotkit/vue exec vitest run src/v2/components/__tests__/A2UIChoicePickerChips.test.ts
+
+      - name: Vue typecheck
+        run: pnpm --filter @copilotkit/vue check-types
+
+      - name: Angular ChoicePicker regression
+        run: pnpm --filter @copilotkit/angular exec vitest run src/a2ui/lib/__tests__/basic-catalog.spec.ts
+
+      - name: Angular typecheck
+        run: pnpm --filter @copilotkit/angular check-types
