@@ -13,7 +13,7 @@ jobs:
   focused:
     if: github.repository == 'kvnloo/CopilotKit'
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - name: Check out exact origin head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -33,20 +33,20 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: React ChoicePicker regression
-        run: pnpm --filter @copilotkit/a2ui-renderer exec vitest run src/react-renderer/__tests__/choice-picker-pressed.test.tsx
+      - name: React renderer tests
+        run: pnpm nx run @copilotkit/a2ui-renderer:test --skip-nx-cache
 
       - name: React renderer typecheck
-        run: pnpm --filter @copilotkit/a2ui-renderer check-types
+        run: pnpm nx run @copilotkit/a2ui-renderer:check-types --skip-nx-cache
 
-      - name: Vue ChoicePicker regression
-        run: pnpm --filter @copilotkit/vue exec vitest run src/v2/components/__tests__/A2UIChoicePickerChips.test.ts
+      - name: Vue tests
+        run: pnpm nx run @copilotkit/vue:test --skip-nx-cache
 
       - name: Vue typecheck
-        run: pnpm --filter @copilotkit/vue check-types
+        run: pnpm nx run @copilotkit/vue:check-types --skip-nx-cache
 
-      - name: Angular ChoicePicker regression
-        run: pnpm --filter @copilotkit/angular exec vitest run src/a2ui/lib/__tests__/basic-catalog.spec.ts
+      - name: Angular tests
+        run: pnpm nx run @copilotkit/angular:test --skip-nx-cache
 
       - name: Angular typecheck
-        run: pnpm --filter @copilotkit/angular check-types
+        run: pnpm nx run @copilotkit/angular:check-types --skip-nx-cache
