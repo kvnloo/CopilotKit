@@ -1,0 +1,35 @@
+{
+  "origin": "https://github.com/CopilotKit/CopilotKit/pull/7401",
+  "validation_pr": "https://github.com/kvnloo/CopilotKit/pull/6",
+  "source_branch": "fix/subagent-console-latest-run-anchor",
+  "source_sha": "8cb31a528da435df70400f1ae17ca29820809fa5",
+  "negative_control_sha": "04bc56aeff506d8d529fe3ebd4b1b442c49fdee5",
+  "requirement": "https://github.com/CopilotKit/CopilotKit/pull/7401#pullrequestreview-5408861995",
+  "attribution": {"source": "Kevin Rajan (kvnloo)", "maintainer_request": "BenTaylorDev", "proof": "AI-assisted independent execution"},
+  "environment": {"architecture": "Linux ARM64", "node": "22.16.0", "pnpm": "10.10.0", "react": "19.2.8", "copilotkit": "1.71.0", "ag_ui_client": "0.0.59"},
+  "method": "Separate exact-SHA worktrees; unmodified SubagentActivityProvider, useDelegationAnchorToolCallIds and HarnessConsole bundled from candidate source. Real CopilotKitProvider/CopilotChatConfigurationProvider and HttpAgent.addMessage/runAgent public APIs consumed deterministic local SSE events. The host listed source-hook anchors rather than mounting the full banking Tools/chat application. No hook mocks, copied console implementation, DOM injection or text mutation.",
+  "fixture": "Two user turns on console-proof-thread; each task starts an expense-analyst with parentToolCallId, which executes a command and starts a merchant-researcher child with parentSubagentRunId. SUBAGENT_FINISHED completes each tree. A second case omits all parentToolCallId fields. The unchanged base receives the same producer events.",
+  "observations": [
+    "Candidate has parent-task-1 and parent-task-2 console anchors. Run 1 retains its analyst and nested researcher lines; run 2 contains only its own lines.",
+    "During run 2, run 1 reads done and run 2 reads 2 agents working. Both read done after completion.",
+    "Nested researcher command padding is 1.5rem versus analyst command padding 0.75rem.",
+    "Missing-ID fallback displays both runs in each console, preserving legacy behavior.",
+    "Exact upstream-base negative control retains only parent-task-1 and mixes run 1 and run 2 lines in that console.",
+    "Browser error collections were empty for candidate and baseline. Owned browser target and SSE server were closed afterward; existing browser pages were preserved."
+  ],
+  "checks": [
+    {"command": "pnpm install --frozen-lockfile", "directory": "examples/showcases/reskinnable-demo", "result": "passed"},
+    {"command": "pnpm run test:unit src/shell/subagents/subagent-anchor.test.ts src/skins/banking/components/harness-console.test.tsx src/shell/subagents/subagent-depth.test.ts", "result": "passed: 3 files, 9 tests"},
+    {"command": "pnpm exec tsc --noEmit --project <focused configuration extending the demo tsconfig.json>", "scope": "subagent activity/anchor, harness console and focused tests", "result": "passed"},
+    {"command": "pnpm run typecheck", "result": "incomplete: full demo check interrupted at 180 seconds without diagnostics; not claimed passing"},
+    {"command": "pnpm run test:unit -- <focused file arguments>", "result": "invalid scope: extra separator caused broader-suite selection; interrupted at 180 seconds; corrected focused invocation above passed"}
+  ],
+  "screenshots": ["two-runs-second-active.png", "two-runs-complete.png", "missing-id-fallback.png", "upstream-base-negative-control.png"],
+  "limits": [
+    "Deterministic transport/component proof, not full live LLM/Python-agent banking-demo acceptance or complete skin styling acceptance.",
+    "The real banking Python agent was not listening on port 8124. Full demo requires the documented Python agent setup and provider credentials.",
+    "Persistence/restore was not exercised; full-demo local typecheck did not complete.",
+    "Historical CHANGES_REQUESTED still requires maintainer re-review. Relevant fork demo jobs were green, but overall fork CI was mixed."
+  ],
+  "workflow_repair": "The shared validation base ran choice-chip regressions for PR6 although those tests belong to PR5. Restrict validation_a2ui_choice.yml's focused job to its existing fix/a2ui-choice-chips-pressed-state head. All six choice-chip regression/typecheck commands remain unchanged; independent demo/subagent gates remain unchanged. Production source is not modified."
+}

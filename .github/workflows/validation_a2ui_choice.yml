@@ -10,6 +10,9 @@ permissions:
 
 jobs:
   focused:
+    # This shared validation base also hosts PRs without the choice-chip patch.
+    # Keep these regressions on their owning head; demo PRs have their own gates.
+    if: github.event.pull_request.head.ref == 'fix/a2ui-choice-chips-pressed-state'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
